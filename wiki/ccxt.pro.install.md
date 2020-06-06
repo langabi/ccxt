@@ -99,3 +99,9 @@ The CCXT Pro is added as a dependency to `composer.json` in your PHP package wit
     // ...
 }
 ```
+
+If you wish to use the asynchronous version of CCXT, which makes all calls (not only the watch_* methods) asynchronous, make sure to install the required packages by running 
+```shell
+composer require recoil/react clue/buzz-react
+```` 
+or by adding them to your composer.json ``require`` block, as above.

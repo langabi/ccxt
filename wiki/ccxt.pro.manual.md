@@ -316,6 +316,19 @@ $loop = \React\EventLoop\Factory::create(); // the event loop goes here ↓
 $exchange = new \ccxtpro\kucoin(array('enableRateLimit' => true, 'loop' => $loop));
 ```
 
+It is generally advisable to use the asynchronous mode of CCXT, however, so that all CCXT REST methods are also asynchronous, otherwise the use of any REST methods will block the WebSocket updates until completed. The required primitives are provided by [RecoilPHP](https://github.com/recoilphp/recoil), with compatibility with ReactPHP provided by [a ReactPHP kernel for RecoilPHP](https://github.com/recoilphp/recoil). A useful introduction is [this article](https://sergeyzhuk.me/2018/10/26/from-promise-to-coroutines/). Instantiation is as follows:  
+
+```PHP
+// PHP
+error_reporting(E_ALL | E_STRICT);
+date_default_timezone_set('UTC');
+require_once 'vendor/autoload.php';
+
+$loop = \React\EventLoop\Factory::create();
+$kernel = \Recoil\React\ReactKernel::create($loop);
+$exchange = new \ccxtpro_async\kucoin($loop, $kernel, array('enableRateLimit' => true));
+```  
+
 ## Exchange Properties
 
 Every CCXT Pro instance contains all properties of the underlying CCXT instance. Apart from the standard CCXT properties, the CCXT Pro instance includes the following:
@@ -459,7 +472,7 @@ if exchange.has['watchOrderBook']:
         except Exception as e:
             print(e)
             # stop the loop on exception or leave it commented to retry
-            # rasie e
+            # raise e
 ```
 
 ```PHP
@@ -478,6 +491,27 @@ if ($exchange->has['watchOrderBook']) {
     };
     $loop->futureTick($main);
 }
+```
+
+Or using the asynchronous RecoilPHP syntax:
+```PHP
+ //PHP - ccxt_async
+if ($exchange->has['watchOrderBook']) {
+    $main = function () use (&$exchange, &$main, $symbol, $limit, $params) {
+        while (true) {
+            try {
+                $orderbook = yield $exchange->watch_order_book($symbol, $limit, $params);
+                echo date('c'), ' ', $symbol, ' ', json_encode(array($orderbook['asks'][0], $orderbook['bids'][0])), "\n";
+            } catch (Exception $e) {
+                echo get_class ($e), ' ', $e->getMessage (), "\n";
+                // stop the loop on exception or leave it commented to retry
+                // throw $e;
+            }
+        }
+    };
+}
+$kernel->execute($main);
+$kernel->run();
 ```
 
 ##### watchTicker
