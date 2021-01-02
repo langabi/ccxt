@@ -88,6 +88,10 @@ class Exchange extends \ccxt\Exchange {
     }
 
     public function fetch2($path, $api = 'public', $method = 'GET', $params = array(), $headers = null, $body = null) : Generator {
+        if ($this->enableRateLimit) {
+            yield $this->throttle();
+        }
+        $this->lastRestRequestTimestamp = $this->milliseconds();
         $request = $this->sign($path, $api, $method, $params, $headers, $body);
         return yield $this->fetch($request['url'], $request['method'], $request['headers'], $request['body']);
     }
@@ -97,10 +101,6 @@ class Exchange extends \ccxt\Exchange {
     }
 
     public function fetch($url, $method = 'GET', $headers = null, $body = null) : Generator {
-        if ($this->enableRateLimit) {
-            yield $this->throttle();
-        }
-
         $headers = array_merge($this->headers, $headers ? $headers : array());
         if (!$headers) {
             $headers = array();
@@ -133,7 +133,7 @@ class Exchange extends \ccxt\Exchange {
                 ),
             ];
             if ($this->timeout) {
-                $connectorOptions['timeout'] = $this->timeout;
+                $connectorOptions['timeout'] = intval($this->timeout / 1000);
             }
 
             if ($this->proxy) {
@@ -145,21 +145,18 @@ class Exchange extends \ccxt\Exchange {
                 $connectorOptions['tcp'] = $proxy;
             }
 
-            $browserOptions = [
-                'obeySuccessCode' => false, //don't throw errors on HTTP codes other than 200
-            ];
-
             $connector = new Connector($this->loop, $connectorOptions);
             $this->browser = new Browser($this->loop, $connector);
-            $this->browser = $this->browser->withOptions($browserOptions);
+            $this->browser = $this->browser->withRejectErrorResponse(false); //don't throw errors on HTTP codes other than 200
+            if ($this->timeout) {
+                $this->browser->withTimeout(intval($this->timeout / 1000));
+            }
         }
 
         if ($this->verbose) {
             $function = array($this, 'print');
             $function('Request:', $method, $url, $verbose_headers, $body);
         }
-
-        $this->lastRestRequestTimestamp = $this->milliseconds();
 
         try {
             /** @var ResponseInterface $response */
