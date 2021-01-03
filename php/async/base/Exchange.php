@@ -362,7 +362,7 @@ class Exchange extends \ccxt\Exchange {
         if (!$this->has['fetchTradingFees']) {
             throw new NotSupported($this->id . ' fetch_trading_fee not supported yet');
         }
-        return $this->fetch_trading_fees($params);
+        return yield $this->fetch_trading_fees($params);
     }
 
     public function load_trading_limits($symbols = null, $reload = false, $params = array()) : Generator {
