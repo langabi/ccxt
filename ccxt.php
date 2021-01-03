@@ -30,14 +30,14 @@ SOFTWARE.
 
 namespace ccxt;
 
-define('PATH_TO_CCXT_ORIG', __DIR__ . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR);
-define('PATH_TO_CCXT_ORIG_BASE', PATH_TO_CCXT_ORIG . 'base' . DIRECTORY_SEPARATOR);
+define('PATH_TO_CCXT', __DIR__ . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR);
+define('PATH_TO_CCXT_BASE', PATH_TO_CCXT . 'base' . DIRECTORY_SEPARATOR);
 define('PATH_TO_CCXT_ASYNC', __DIR__ . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'async' . DIRECTORY_SEPARATOR);
 define('PATH_TO_CCXT_ASYNC_BASE', PATH_TO_CCXT_ASYNC . 'base' . DIRECTORY_SEPARATOR);
 
 spl_autoload_register(function ($class) {
     // used to include static dependencies
-    $PATH = PATH_TO_CCXT_ORIG . 'static_dependencies/';
+    $PATH = PATH_TO_CCXT . 'static_dependencies/';
     if (strpos($class, 'kornrunner') !== false) {
         $version = phpversion();
         if (intval(explode('.', $version)[0]) < 7) {
@@ -53,13 +53,40 @@ spl_autoload_register(function ($class) {
         require_once $file;
 });
 
-require_once PATH_TO_CCXT_ORIG_BASE . 'errors.php';
-require_once PATH_TO_CCXT_ORIG_BASE . 'Exchange.php';
-require_once PATH_TO_CCXT_ASYNC_BASE . 'Exchange.php';
-
 $autoloadFile = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 if (file_exists($autoloadFile))
     require_once $autoloadFile;
+require_once PATH_TO_CCXT_BASE . 'BaseError.php';
+require_once PATH_TO_CCXT_BASE . 'ExchangeError.php';
+require_once PATH_TO_CCXT_BASE . 'AuthenticationError.php';
+require_once PATH_TO_CCXT_BASE . 'PermissionDenied.php';
+require_once PATH_TO_CCXT_BASE . 'AccountSuspended.php';
+require_once PATH_TO_CCXT_BASE . 'ArgumentsRequired.php';
+require_once PATH_TO_CCXT_BASE . 'BadRequest.php';
+require_once PATH_TO_CCXT_BASE . 'BadSymbol.php';
+require_once PATH_TO_CCXT_BASE . 'BadResponse.php';
+require_once PATH_TO_CCXT_BASE . 'NullResponse.php';
+require_once PATH_TO_CCXT_BASE . 'InsufficientFunds.php';
+require_once PATH_TO_CCXT_BASE . 'InvalidAddress.php';
+require_once PATH_TO_CCXT_BASE . 'AddressPending.php';
+require_once PATH_TO_CCXT_BASE . 'InvalidOrder.php';
+require_once PATH_TO_CCXT_BASE . 'OrderNotFound.php';
+require_once PATH_TO_CCXT_BASE . 'OrderNotCached.php';
+require_once PATH_TO_CCXT_BASE . 'CancelPending.php';
+require_once PATH_TO_CCXT_BASE . 'OrderImmediatelyFillable.php';
+require_once PATH_TO_CCXT_BASE . 'OrderNotFillable.php';
+require_once PATH_TO_CCXT_BASE . 'DuplicateOrderId.php';
+require_once PATH_TO_CCXT_BASE . 'NotSupported.php';
+require_once PATH_TO_CCXT_BASE . 'NetworkError.php';
+require_once PATH_TO_CCXT_BASE . 'DDoSProtection.php';
+require_once PATH_TO_CCXT_BASE . 'RateLimitExceeded.php';
+require_once PATH_TO_CCXT_BASE . 'ExchangeNotAvailable.php';
+require_once PATH_TO_CCXT_BASE . 'OnMaintenance.php';
+require_once PATH_TO_CCXT_BASE . 'InvalidNonce.php';
+require_once PATH_TO_CCXT_BASE . 'RequestTimeout.php';
+
+require_once PATH_TO_CCXT_BASE . 'Exchange.php';
+require_once PATH_TO_CCXT_ASYNC_BASE . 'Exchange.php';
 
 spl_autoload_register (function ($class_name) {
     if (strpos($class_name, 'ccxt_async') !== false) {
@@ -67,7 +94,7 @@ spl_autoload_register (function ($class_name) {
         $file = PATH_TO_CCXT_ASYNC . $class_name . '.php';
     } else {
         $class_name = str_replace ("ccxt\\", "", $class_name);
-        $file = PATH_TO_CCXT_ORIG . $class_name . '.php';
+        $file = PATH_TO_CCXT . $class_name . '.php';
     }
     if (file_exists ($file))
         require_once $file;

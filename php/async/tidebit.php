@@ -22,10 +22,17 @@ class tidebit extends Exchange {
             'rateLimit' => 1000,
             'version' => 'v2',
             'has' => array(
-                'fetchDepositAddress' => true,
+                'cancelOrder' => true,
                 'CORS' => false,
-                'fetchTickers' => true,
+                'createOrder' => true,
+                'fetchBalance' => true,
+                'fetchDepositAddress' => true,
+                'fetchMarkets' => true,
                 'fetchOHLCV' => true,
+                'fetchOrderBook' => true,
+                'fetchTicker' => true,
+                'fetchTickers' => true,
+                'fetchTrades' => true,
                 'withdraw' => true,
             ),
             'timeframes' => array(
@@ -42,7 +49,7 @@ class tidebit extends Exchange {
                 '1w' => '10080',
             ),
             'urls' => array(
-                'logo' => 'https://user-images.githubusercontent.com/1294454/39034921-e3acf016-4480-11e8-9945-a6086a1082fe.jpg',
+                'logo' => 'https://user-images.githubusercontent.com/51840849/87460811-1e690280-c616-11ea-8652-69f187305add.jpg',
                 'api' => 'https://www.tidebit.com',
                 'www' => 'https://www.tidebit.com',
                 'doc' => array(
@@ -247,15 +254,12 @@ class tidebit extends Exchange {
         $result = array();
         for ($i = 0; $i < count($ids); $i++) {
             $id = $ids[$i];
-            $market = null;
-            if (is_array($this->markets_by_id) && array_key_exists($id, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$id];
-                $symbol = $market['symbol'];
-                $ticker = $tickers[$id];
-                $result[$symbol] = $this->parse_ticker($ticker, $market);
-            }
+            $market = $this->safe_market($id);
+            $symbol = $market['symbol'];
+            $ticker = $tickers[$id];
+            $result[$symbol] = $this->parse_ticker($ticker, $market);
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_ticker($symbol, $params = array ()) : Generator {
@@ -307,15 +311,25 @@ class tidebit extends Exchange {
         return $this->parse_trades($response, $market, $since, $limit);
     }
 
-    public function parse_ohlcv($ohlcv, $market = null, $timeframe = '1m', $since = null, $limit = null) {
-        return [
-            $ohlcv[0] * 1000,
-            $ohlcv[1],
-            $ohlcv[2],
-            $ohlcv[3],
-            $ohlcv[4],
-            $ohlcv[5],
-        ];
+    public function parse_ohlcv($ohlcv, $market = null) {
+        //
+        //     array(
+        //         1498530360,
+        //         2700.0,
+        //         2700.0,
+        //         2700.0,
+        //         2700.0,
+        //         0.01
+        //     )
+        //
+        return array(
+            $this->safe_timestamp($ohlcv, 0),
+            $this->safe_float($ohlcv, 1),
+            $this->safe_float($ohlcv, 2),
+            $this->safe_float($ohlcv, 3),
+            $this->safe_float($ohlcv, 4),
+            $this->safe_float($ohlcv, 5),
+        );
     }
 
     public function fetch_ohlcv($symbol, $timeframe = '1m', $since = null, $limit = null, $params = array ()) : Generator {
@@ -331,11 +345,18 @@ class tidebit extends Exchange {
             'limit' => $limit,
         );
         if ($since !== null) {
-            $request['timestamp'] = intval ($since / 1000);
+            $request['timestamp'] = intval($since / 1000);
         } else {
             $request['timestamp'] = 1800000;
         }
         $response = yield $this->publicGetK (array_merge($request, $params));
+        //
+        //     [
+        //         [1498530360,2700.0,2700.0,2700.0,2700.0,0.01],
+        //         [1498530420,2700.0,2700.0,2700.0,2700.0,0],
+        //         [1498530480,2700.0,2700.0,2700.0,2700.0,0],
+        //     ]
+        //
         if ($response === 'null') {
             return array();
         }
@@ -387,13 +408,8 @@ class tidebit extends Exchange {
         //         )
         //     }
         //
-        $symbol = null;
-        if ($market !== null) {
-            $symbol = $market['symbol'];
-        } else {
-            $marketId = $order['market'];
-            $symbol = $this->markets_by_id[$marketId]['symbol'];
-        }
+        $marketId = $this->safe_string($order, 'market');
+        $symbol = $this->safe_symbol($marketId, $market);
         $timestamp = $this->parse8601($this->safe_string($order, 'created_at'));
         $status = $this->parse_order_status($this->safe_string($order, 'state'));
         $id = $this->safe_string($order, 'id');
@@ -409,6 +425,7 @@ class tidebit extends Exchange {
                 $cost = $price * $filled;
             }
         }
+        $average = $this->safe_float($order, 'avg_price');
         return array(
             'id' => $id,
             'clientOrderId' => null,
@@ -418,8 +435,11 @@ class tidebit extends Exchange {
             'status' => $status,
             'symbol' => $symbol,
             'type' => $type,
+            'timeInForce' => null,
+            'postOnly' => null,
             'side' => $side,
             'price' => $price,
+            'stopPrice' => null,
             'amount' => $amount,
             'filled' => $filled,
             'remaining' => $remaining,
@@ -427,7 +447,7 @@ class tidebit extends Exchange {
             'trades' => null,
             'fee' => null,
             'info' => $order,
-            'average' => null,
+            'average' => $average,
         );
     }
 
@@ -444,8 +464,7 @@ class tidebit extends Exchange {
             $request['price'] = (string) $price;
         }
         $response = yield $this->privatePostOrders (array_merge($request, $params));
-        $market = $this->markets_by_id[$response['market']];
-        return $this->parse_order($response, $market);
+        return $this->parse_order($response);
     }
 
     public function cancel_order($id, $symbol = null, $params = array ()) : Generator {

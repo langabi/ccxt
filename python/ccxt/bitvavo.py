@@ -30,7 +30,7 @@ class bitvavo(Exchange):
             'countries': ['NL'],  # Netherlands
             'rateLimit': 500,
             'version': 'v2',
-            'certified': False,
+            'certified': True,
             'pro': True,
             'has': {
                 'CORS': False,
@@ -235,6 +235,9 @@ class bitvavo(Exchange):
                     'expires': 1000,  # 1 second
                 },
             },
+            'commonCurrencies': {
+                'MIOTA': 'IOTA',  # https://github.com/ccxt/ccxt/issues/7487
+            },
         })
 
     def fetch_time(self, params={}):
@@ -427,25 +430,13 @@ class bitvavo(Exchange):
         #         "timestamp":1590381666900
         #     }
         #
-        symbol = None
         marketId = self.safe_string(ticker, 'market')
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market, '-')
         timestamp = self.safe_integer(ticker, 'timestamp')
         last = self.safe_float(ticker, 'last')
         baseVolume = self.safe_float(ticker, 'volume')
         quoteVolume = self.safe_float(ticker, 'volumeQuote')
-        vwap = None
-        if (quoteVolume is not None) and (baseVolume is not None) and (baseVolume > 0):
-            vwap = quoteVolume / baseVolume
+        vwap = self.vwap(baseVolume, quoteVolume)
         change = None
         percentage = None
         average = None
@@ -537,7 +528,7 @@ class bitvavo(Exchange):
         #
         return self.parse_trades(response, market, since, limit)
 
-    def parse_trade(self, trade, market):
+    def parse_trade(self, trade, market=None):
         #
         # fetchTrades(public)
         #
@@ -578,6 +569,22 @@ class bitvavo(Exchange):
         #         "settled":true
         #     }
         #
+        # watchMyTrades(private)
+        #
+        #     {
+        #         event: 'fill',
+        #         timestamp: 1590964470132,
+        #         market: 'ETH-EUR',
+        #         orderId: '85d082e1-eda4-4209-9580-248281a29a9a',
+        #         fillId: '861d2da5-aa93-475c-8d9a-dce431bd4211',
+        #         side: 'sell',
+        #         amount: '0.1',
+        #         price: '211.46',
+        #         taker: True,
+        #         fee: '0.056',
+        #         feeCurrency: 'EUR'
+        #     }
+        #
         price = self.safe_float(trade, 'price')
         amount = self.safe_float(trade, 'amount')
         cost = None
@@ -585,19 +592,9 @@ class bitvavo(Exchange):
             cost = price * amount
         timestamp = self.safe_integer(trade, 'timestamp')
         side = self.safe_string(trade, 'side')
-        id = self.safe_string(trade, 'id')
+        id = self.safe_string_2(trade, 'id', 'fillId')
         marketId = self.safe_integer(trade, 'market')
-        symbol = None
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market, '-')
         taker = self.safe_value(trade, 'taker')
         takerOrMaker = None
         if taker is not None:
@@ -656,7 +653,7 @@ class bitvavo(Exchange):
         orderbook['nonce'] = self.safe_integer(response, 'nonce')
         return orderbook
 
-    def parse_ohlcv(self, ohlcv, market=None, timeframe='1m', since=None, limit=None):
+    def parse_ohlcv(self, ohlcv, market=None):
         #
         #     [
         #         1590383700000,
@@ -1096,17 +1093,7 @@ class bitvavo(Exchange):
         id = self.safe_string(order, 'orderId')
         timestamp = self.safe_integer(order, 'created')
         marketId = self.safe_string(order, 'market')
-        symbol = None
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market, '-')
         status = self.parse_order_status(self.safe_string(order, 'status'))
         side = self.safe_string(order, 'side')
         type = self.safe_string(order, 'orderType')
@@ -1146,6 +1133,8 @@ class bitvavo(Exchange):
             if numTrades > 0:
                 lastTrade = self.safe_value(trades, numTrades - 1)
                 lastTradeTimestamp = lastTrade['timestamp']
+        timeInForce = self.safe_string(order, 'timeInForce')
+        postOnly = self.safe_value(order, 'postOnly')
         return {
             'info': order,
             'id': id,
@@ -1155,8 +1144,11 @@ class bitvavo(Exchange):
             'lastTradeTimestamp': lastTradeTimestamp,
             'symbol': symbol,
             'type': type,
+            'timeInForce': timeInForce,
+            'postOnly': postOnly,
             'side': side,
             'price': price,
+            'stopPrice': None,
             'amount': amount,
             'cost': cost,
             'average': average,

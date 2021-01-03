@@ -53,11 +53,11 @@ foreach (get_defined_constants(true)['user'] as $const => $val) {
     }
 }
 
-$version = '1.28.94';
+$version = '1.40.10';
 
 class Exchange extends \ccxt\Exchange {
 
-    const VERSION = '1.28.94';
+    const VERSION = '1.40.10';
 
     public function __construct($options = array())
     {
@@ -588,7 +588,7 @@ class Exchange extends \ccxt\Exchange {
         throw new NotSupported($this->id . ' cancel_order() not supported or not supported yet');
     }
 
-    public function edit_order($id, $symbol, $type, $side, $amount, $price, $params = array()) : Generator {
+    public function edit_order($id, $symbol, $type, $side, $amount, $price = NULL, $params = array()) : Generator {
         if (!$this->enableRateLimit) {
             throw new ExchangeError($this->id . ' edit_order() requires enableRateLimit = true');
         }
@@ -620,7 +620,7 @@ class Exchange extends \ccxt\Exchange {
         return yield $this->edit_limit_order($id, $symbol, $side, $amount, $price, $params);
     }
 
-    public function editOrder($id, $symbol, $type, $side, $amount, $price, $params = array()) : Generator {
+    public function editOrder($id, $symbol, $type, $side, $amount, $price = NULL, $params = array()) : Generator {
         return yield $this->edit_order($id, $symbol, $type, $side, $amount, $price, $params);
     }
 
